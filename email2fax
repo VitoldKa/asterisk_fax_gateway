@@ -1,0 +1,157 @@
+#!/bin/bash
+
+
+
+while test $# != 0
+do case "$1" in
+        -dry)   dryrun=1 ;;
+        -d)     mail=1;;
+#       -l)     shift; opt="$opt -l $1" ;;
+esac
+shift
+done
+
+tmpdir="/tmp/email2fax/"
+mkdir $tmpdir
+#if [ -z $dryrun ]
+#then
+        tmpdir=$tmpdir`date +%N`"/"
+#fi
+emailfile="email.eml"
+mail=1
+
+mkdir  $tmpdir
+
+#
+#rm $tmpdir$emailfile
+
+# Save email sed 's/\n//'
+cat - >>$tmpdir$emailfile
+
+######################################################
+# subject security : B0DA158AE158
+if subject=`grep  "Subject: " $tmpdir$emailfile | sed 's/Subject: //'`
+then
+        #echo "Subject: "$subject
+        if [[ "$subject"=="B0DA158AE158" ]]
+        then
+                echo "ok"
+        else                                                 
+                echo "Bad subject: "$subject
+                exit
+        fi
+fi
+
+echo "ok"
+
+# Destination number
+if to=`grep  "To: " $tmpdir$emailfile | sed 's/To: //' | sed 's/@fax.vitou.com//'`
+then
+	to=`echo $to | sed "s/[<>]//g"` 
+        echo "To: "$to
+fi
+
+# email for replay
+if from=`grep  "From: " $tmpdir$emailfile | sed 's/From: //'`
+then
+        echo "From: "$from
+fi
+
+# file extract
+filename=`munpack -C $tmpdir $tmpdir$emailfile | cut -f1 -d " "`
+
+if [ "`file --mime-type -b $tmpdir$filename`" ]
+then
+        echo "filetype: `file --mime-type -b $tmpdir$filename`"
+fi
+
+# File type detect
+case "`file --mime-type -b $tmpdir$filename`" in
+        "image/tiff")
+                echo "image/tiff"
+                # convert
+                #convert -verbose -resample 204x98 $tmpdir$filename $tmpdir$filename.2.tif
+
+                tiff2ps -w 8.5 -h 11 -O $tmpdir$filename.ps -a $tmpdir$filename
+                #tiff2pdf -u i -d -o $tmpdir$filename.pdf $tmpdir$filename.tif
+                # tiff2pdf  -p A4 -x204 -y98 -u i -d -o $tmpdir$filename.pdf $tmpdir$filename.2.tif
+                #gs -q -sDEVICE=tiffg3 -dBATCH -dNOPAUSE -dSAFER -sOutputFile=$tmpdir$filename.tifg3 -f $tmpdir$filename.pdf
+                gs -r204x196 -sPAPERSIZE=a4 -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=tiffg3 -sOutputFile=$tmpdir$filename.g3.tif -f $tmpdir$filename.$
+
+                #| gs -q -sDEVICE=tiffg3 -sPAPERSIZE=a4 -r204x196 -dNOPAUSE -sOutputFile=$tmpdir$filename.tifg3
+                #tiff2ps $tmpdir$filename | gs  -sOutputFile=$tmpdir$filename.tifg3 -sDEVICE=tiffg3 -dSAFER -dNOPAUSE "/tmp/email2fax/313472731/ou$
+        ;;
+        "application/pdf")
+                echo "application/pdf"
+                #pdf2ps $tmpdir$filename $tmpdir$filename.ps
+                gs -r204x196 -sPAPERSIZE=a4 -g1728x2292 -dFIXEDMEDIA -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=tiffg3 -sOutputFile=$tmpdir$filename.g3.tif -f $tmpdir$filename
+        ;;
+        *)
+                echo "File type \""`file --mime-type -b $tmpdir$filename`"\" not suported"
+        ;;
+esac
+
+
+#
+if [ -n $mail ]
+then
+echo "Mail";
+sendmail -t <<EOF
+From: "Fax-Gateway" <>
+To: test <vitold@vitou.com>
+Subject: Fax Test
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="_boundarystring"
+
+--_boundarystring
+Content-Type: text/plain; charset=ISO-8859-1
+
+This is a multi-part message in MIME format.
+Number: ${num}
+# pages: ${pages}
+Resolution: ${resolution}
+Bitrate: ${bitrate}
+Error: ${error}
+
+--_boundarystring
+Content-Type: image/tiff name="fax.tif"
+Content-Transfer-Encoding: Base64
+Content-Disposition: attachment; filename="fax.tif"
+
+`base64 $tmpdir$filename.g3.tif`
+--_boundarystring--
+EOF
+
+# `base64 ${tmpdir$filename} .g3.tif`
+fi
+
+
+# create call file
+# T38-SendFax
+if [ -z $dryrun ]
+then
+cat <<EOF >/var/spool/asterisk/outgoing/t.call
+Channel: SIP/fax/$to
+CallerID: T38 SendFax
+WaitTime: 180
+MaxRetries: 0
+RetryTime: 300
+Account:
+Archive: false
+Context: fax_out
+Extension: 00430000000
+Priority: 1
+SetVar: SENDER=$from
+SetVar: T38CALL=1
+SetVar: LOCALSTATIONID=FAX Gateway
+SetVar: TIFF=$tmpdir$filename.g3.tif
+SetVar: ACCOUNT=3987
+SetVar: REMOTESTATIONID=$to
+SetVar: TMPDIR=$tmpdir
+SetVar: LOCALHEADERINFO=
+#Vitold Kapshitzer
+EOF
+else
+        echo "Runnong in dry run"
+fi
+

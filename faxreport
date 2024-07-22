@@ -1,0 +1,99 @@
+#!/bin/bash
+
+jobID=$1
+exten=$2
+status=$3
+sender=$4
+remotestationID=$5
+origremotestationID=$6
+faxpages=$7
+faxresolution=$8
+faxbitrate=$9
+faxerror=$10
+account=$11
+data=$12
+reason=$13
+tmpdir=$14
+
+from="From: \"Fax-Gateway\" <>"
+to=$sender
+#to="vitold@vitou.com"
+subject="Fax report : $status $reson"
+date=`date +"%A %d %B %Y à %R:%S" `
+
+if [ "$status" != "SUCCESS" ]
+then
+	# failed[$REASON]="My custom text to send to the end user"
+	failed[0]="General call failure, not BUSY, not NO_ANSWER, probable no route to destination"
+	failed[1]="Destination hung up"
+	failed[3]="Destination ring timeout"
+	failed[5]="Destination busy"
+	failed[8]="Destination congestion"
+	
+	reason=$failed[$reason]
+else
+	reason=""
+fi
+
+
+mail -a "$from" -a "Content-Type: text/plain; charset=UTF-8" -s "$subject" "$to" <<EOF
+tmpdir: $tmpdir
+Date: $date
+Number: $exten
+Status: ${status}
+destination: $remotestationID
+Pages: $faxpages
+Speed: $faxbitrate
+
+jobID: $jobID
+exten: $exten
+status: $status
+sender: $sender
+remotesationID: $remotestationID
+origremotestationID: $origremotestationID
+faxpages: $faxpages
+faxresolution: $faxresolution
+faxbitrate: $faxbitrate
+faxerror: $faxerror
+account: $account
+data: $data
+reason: $reason
+tmpdir: $tmpdir
+
+$faxerror 
+EOF
+
+
+#echo /tmp/email2fax/133412663/
+rm -r $tmpdir
+
+#${LOCALSTATIONID}: To identify itself to the remote end
+#${LOCALHEADERINFO}: To generate a header line on each page
+#${FAXSTATUS}: 
+    #SUCCESS
+        #FAILED
+        #${FAXERROR}: Cause of failure
+        #${REMOTESTATIONID}: The CSID of the remote side
+        #${FAXPAGES}: Number of pages sent
+        #${FAXBITRATE}: Transmission rate
+       #${FAXRESOLUTION}: Resolution of sent fax
+        
+
+#${EXTEN} SENT, "${SENDER}", "${REMOTESTATIONID}", "${ORIGREMOTESTATIONID}", "${FAXPAGES}", "${FAXRESOLUTION}", "${FAXBITRATE}", "${FAXERROR}", "${ACCOUNT}", "${DATA}")})
+#"${JOBID}", SENT, "${SENDER}", "${REMOTESTATIONID}", "${ORIGREMOTESTATIONID}", "${FAXPAGES}", "${FAXRESOLUTION}", "${FAXBITRATE}", "${FAXERROR}", "${ACCOUNT}", "${DATA}")}))
+
+
+
+#"${JOBID}", SEND_FAILED, "${SENDER}", "${REMOTESTATIONID}", "${ORIGREMOTESTATIONID}", "${FAXPAGES}", "${FAXRESOLUTION}", "${FAXBITRATE}", "${FAXERROR}", "${ACCOUNT}", "${DATA}")})
+#"${JOBID}", SENTSEND_FAILED, "${SENDER}", "${REMOTESTATIONID}", "${ORIGREMOTESTATIONID}", "${FAXPAGES}", "${FAXRESOLUTION}", "${FAXBITRATE}", "${FAXERROR}", "${ACCOUNT}", "${DATA}")}))   
+
+
+
+
+#recive
+#"${REMOTESTATIONID}", "${CALLERID(num)}", "${FAXPAGES}", "${FAXRESOLUTION}", "${FAXBITRATE}", "${FAXERROR}"
+#RECEIVED
+
+#"${REMOTESTATIONID}", "${CALLERID(num)}", "${FAXPAGES}", "${FAXRESOLUTION}", "${FAXBITRATE}", "${FAXERROR}", "3987", "testBox")})
+#RECEIVED_FAILED
+

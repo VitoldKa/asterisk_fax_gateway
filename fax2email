@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#${TIFF} "Incoming Fax from ${REMOTESTATIONID}" "${CALLERID(num)}", "${FAXPAGES}", "${FAXRESOLUTION}", "${FAXBITRATE}", "${FAXERROR}"
+
+filename=$1
+subject=$2
+num=$3
+pages=$4
+resulution=$5
+bitate=$6
+error=$7
+
+
+sendmail -t <<!
+From: "Fax-Gateway" <>
+To: test <vitold@vitou.com>
+Subject: ${subject}
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="_boundarystring"
+
+--_boundarystring
+Content-Type: text/plain; charset=ISO-8859-1
+
+This is a multi-part message in MIME format.
+Number: ${num}
+# pages: ${pages}
+Resolution: ${resolution}
+Bitrate: ${bitrate}
+Error: ${error}
+
+--_boundarystring
+Content-Type: image/tiff name="fax.tif"
+Content-Transfer-Encoding: Base64
+Content-Disposition: attachment; filename="fax.tif"
+
+`base64 ${filename}`
+--_boundarystring--
+!
+
